@@ -25,7 +25,7 @@
  ******************************************************************************/
 
 #define LOG_TAG "bt_vendor"
-#define BLUETOOTH_MAC_ADDR_BOOT_PROPERTY "ro.boot.btmacaddr"
+//#define BLUETOOTH_MAC_ADDR_BOOT_PROPERTY "ro.boot.btmacaddr"
 
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -37,13 +37,10 @@
 #include <sys/socket.h>
 #include <cutils/sockets.h>
 #include <linux/un.h>
-#ifdef BT_NV_SUPPORT
 #include "bt_vendor_persist.h"
-#endif
 #include "hw_rome.h"
 
 #define WAIT_TIMEOUT 200000
-#define BT_VND_OP_GET_LINESPEED 12
 
 /******************************************************************************
 **  Externs
@@ -55,6 +52,8 @@ extern int rome_soc_init(int fd, char *bdaddr);
 extern int check_embedded_mode(int fd);
 extern int rome_get_addon_feature_list(int fd);
 extern int rome_ver;
+extern int enable_controller_log(int fd);
+extern int bt_powerup(int en );
 /******************************************************************************
 **  Variables
 ******************************************************************************/
@@ -98,16 +97,6 @@ bool is_soc_initialized(void);
 /******************************************************************************
 **  Local type definitions
 ******************************************************************************/
-
-/******************************************************************************
-**  TODO: Cleanup to use header file. Declare externally used functions.
-******************************************************************************/
-int readTrpState();
-int ath3k_init(int fd, int speed, int init_speed, char *bdaddr, struct termios *ti);
-int userial_clock_operation(int fd, int cmd);
-int rome_soc_init(int fd, char *bdaddr);
-void lpm_set_ar3k(uint8_t pio, uint8_t action, uint8_t polarity);
-int userial_vendor_get_baud(void);
 
 
 /******************************************************************************
@@ -200,7 +189,7 @@ static int get_bt_soc_type()
     ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
     if (ret != 0) {
         ALOGI("qcom.bluetooth.soc set to %s\n", bt_soc_type);
-        if (!strncasecmp(bt_soc_type, "rome", sizeof("rome"))) {
+        if (!strncasecmp(bt_soc_type, "rome_uart", sizeof("rome_uart"))) {
             return BT_SOC_ROME;
         }
         else if (!strncasecmp(bt_soc_type, "ath3k", sizeof("ath3k"))) {
@@ -223,6 +212,9 @@ bool can_perform_action(char action) {
     bool can_perform = false;
     char ref_count[PROPERTY_VALUE_MAX];
     int value, ret;
+    
+
+    return true;//tkun add
 
     property_get("wc_transport.ref_count", ref_count, "0");
 
@@ -312,9 +304,8 @@ void start_hci_filter() {
 
         ALOGV("%s: Exit ", __func__);
 }
-
-/** Bluetooth Controller power up or shutdown */
-static int bt_powerup(int en )
+//tkun add
+int bt_powerup_init(int en )
 {
     char rfkill_type[64], *enable_ldo_path = NULL;
     char type[16], enable_ldo[6];
@@ -323,13 +314,16 @@ static int bt_powerup(int en )
     char disable[PROPERTY_VALUE_MAX];
     char state;
     char on = (en)?'1':'0';
+    char bt_status_on = '1';
+    char bt_status_off = '0';
+
 
 #ifdef WIFI_BT_STATUS_SYNC
     char wifi_status[PROPERTY_VALUE_MAX];
     int lock_fd;
 #endif /*WIFI_BT_STATUS_SYNC*/
 
-    ALOGI("bt_powerup: %c", on);
+//    ALOGI("bt_powerup: %c", on);
 
     /* Check if rfkill has been disabled */
     ret = property_get("ro.rfkilldisabled", disable, "0");
@@ -398,6 +392,7 @@ static int bt_powerup(int en )
         goto done;
     }
 #endif
+/*
     ret = asprintf(&enable_ldo_path, "/sys/class/rfkill/rfkill%d/device/extldo", rfkill_id);
     if( (ret < 0 ) || (enable_ldo_path == NULL) )
     {
@@ -418,9 +413,50 @@ static int bt_powerup(int en )
         ALOGI("External LDO has been configured");
         enable_extldo = TRUE;
     }
+*/
+//tkun add 1
+#if 0
+//if (strcmp(on,"0") == 0){
+       
+       if ((size = write(fd, &bt_status_off, 1)) < 0) {
+	ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+#ifdef WIFI_BT_STATUS_SYNC
+	bt_semaphore_release(lock_fd);
+	bt_semaphore_destroy(lock_fd);
+#endif
+     usleep(500000);
+}
+     if ((size = write(fd, &bt_status_on, 1)) < 0) {
+          ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+  #ifdef WIFI_BT_STATUS_SYNC
+          bt_semaphore_release(lock_fd);
+          bt_semaphore_destroy(lock_fd);
+  #endif
 
-    ALOGE("Write %c to rfkill\n", on);
-
+}
+//}
+#endif
+#if 0
+if (strcmp(on,"1") == 0){
+         if ((size = write(fd, &bt_status_off, 1)) < 0) {
+          ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+  #ifdef WIFI_BT_STATUS_SYNC
+          bt_semaphore_release(lock_fd);
+          bt_semaphore_destroy(lock_fd);
+  #endif
+       usleep(500000);
+  }
+       if ((size = write(fd, &bt_status_on, 1)) < 0) {
+            ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+    #ifdef WIFI_BT_STATUS_SYNC
+            bt_semaphore_release(lock_fd);
+            bt_semaphore_destroy(lock_fd);
+    #endif
+}
+#endif
+//}
+//tkun add
+#if 0
     /* Write value to control rfkill */
     if ((size = write(fd, &on, 1)) < 0) {
         ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
@@ -430,10 +466,11 @@ static int bt_powerup(int en )
 #endif
         return -1;
     }
+#endif//tkun add
 #ifdef BT_SOC_TYPE_ROME
     if(on == '0'){
         ALOGE("Stopping HCI filter as part of CTRL:OFF");
-        stop_hci_filter();
+//        stop_hci_filter();
         property_set("wc_transport.soc_initialized", "0");
     }
 #endif
@@ -483,6 +520,231 @@ done:
     return 0;
 }
 
+
+
+
+
+
+
+/** Bluetooth Controller power up or shutdown */
+//static int bt_powerup(int en )
+int bt_powerup(int en )
+{
+    char rfkill_type[64], *enable_ldo_path = NULL;
+    char type[16], enable_ldo[6];
+    int fd, size, i, ret, fd_ldo;
+
+    char disable[PROPERTY_VALUE_MAX];
+    char state;
+    char on = (en)?'1':'0';
+    char bt_status_on = '1';
+    char bt_status_off = '0';
+
+
+#ifdef WIFI_BT_STATUS_SYNC
+    char wifi_status[PROPERTY_VALUE_MAX];
+    int lock_fd;
+#endif /*WIFI_BT_STATUS_SYNC*/
+#if 1
+    ALOGI("bt_powerup: %c", on);
+
+    /* Check if rfkill has been disabled */
+    ret = property_get("ro.rfkilldisabled", disable, "0");
+    if (!ret ){
+        ALOGE("Couldn't get ro.rfkilldisabled (%d)", ret);
+        return -1;
+    }
+    /* In case rfkill disabled, then no control power*/
+    if (strcmp(disable, "1") == 0) {
+        ALOGI("ro.rfkilldisabled : %s", disable);
+        return -1;
+    }
+
+#ifdef WIFI_BT_STATUS_SYNC
+    lock_fd = bt_semaphore_create();
+    bt_semaphore_get(lock_fd);
+    bt_wait_for_service_done();
+#endif
+#endif
+    /* Assign rfkill_id and find bluetooth rfkill state path*/
+    for(i=0;(rfkill_id == -1) && (rfkill_state == NULL);i++)
+    {
+        snprintf(rfkill_type, sizeof(rfkill_type), "/sys/class/rfkill/rfkill%d/type", i);
+        if ((fd = open(rfkill_type, O_RDONLY)) < 0)
+        {
+            ALOGE("open(%s) failed: %s (%d)\n", rfkill_type, strerror(errno), errno);
+
+#ifdef WIFI_BT_STATUS_SYNC
+//            bt_semaphore_release(lock_fd);
+//            bt_semaphore_destroy(lock_fd);
+#endif
+            return -1;
+        }
+
+        size = read(fd, &type, sizeof(type));
+        close(fd);
+
+        if ((size >= 9) && !memcmp(type, "bluetooth", 9))
+       {
+            asprintf(&rfkill_state, "/sys/class/rfkill/rfkill%d/state", rfkill_id = i);
+            break;
+        }
+    }
+
+    /* Get rfkill State to control */
+    if (rfkill_state != NULL)
+    {
+        if ((fd = open(rfkill_state, O_RDWR)) < 0)
+        {
+            ALOGE("open(%s) for write failed: %s (%d)",rfkill_state, strerror(errno), errno);
+#ifdef WIFI_BT_STATUS_SYNC
+//            bt_semaphore_release(lock_fd);
+//            bt_semaphore_destroy(lock_fd);
+#endif
+
+            return -1;
+       } 
+   }
+#ifdef BT_SOC_TYPE_ROME
+//    if(can_perform_action(on) == false) {
+//        ALOGE("%s:can't perform action as it is being used by other clients", __func__);
+#ifdef WIFI_BT_STATUS_SYNC
+//        bt_semaphore_release(lock_fd);
+//        bt_semaphore_destroy(lock_fd);
+#endif
+//        goto done;
+//    }
+#endif
+/*
+    ret = asprintf(&enable_ldo_path, "/sys/class/rfkill/rfkill%d/device/extldo", rfkill_id);
+    if( (ret < 0 ) || (enable_ldo_path == NULL) )
+    {
+        ALOGE("Memory Allocation failure");
+        return -1;
+    }
+    if ((fd_ldo = open(enable_ldo_path, O_RDWR)) < 0) {
+        ALOGE("open(%s) failed: %s (%d)", enable_ldo_path, strerror(errno), errno);
+        return -1;
+    }
+    size = read(fd_ldo, &enable_ldo, sizeof(enable_ldo));
+    close(fd_ldo);
+    if (size <= 0) {
+        ALOGE("read(%s) failed: %s (%d)", enable_ldo_path, strerror(errno), errno);
+        return -1;
+    }
+    if (!memcmp(enable_ldo, "true", 4)) {
+        ALOGI("External LDO has been configured");
+        enable_extldo = TRUE;
+    }
+*/
+    ALOGE("Write %c to rfkill\n", on);
+//tkun add 1
+#if 1
+//if (strcmp(on,"0") == 0){
+       
+       if ((size = write(fd, &bt_status_off, 1)) < 0) {
+	ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+#ifdef WIFI_BT_STATUS_SYNC
+	bt_semaphore_release(lock_fd);
+	bt_semaphore_destroy(lock_fd);
+#endif
+}
+     usleep(400000);
+     if ((size = write(fd, &bt_status_on, 1)) < 0) {
+          ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+  #ifdef WIFI_BT_STATUS_SYNC
+          bt_semaphore_release(lock_fd);
+          bt_semaphore_destroy(lock_fd);
+  #endif
+}
+     usleep(200000);
+//}
+#endif
+#if 0
+if (strcmp(on,"1") == 0){
+         if ((size = write(fd, &bt_status_off, 1)) < 0) {
+          ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+  #ifdef WIFI_BT_STATUS_SYNC
+          bt_semaphore_release(lock_fd);
+          bt_semaphore_destroy(lock_fd);
+  #endif
+       usleep(500000);
+  }
+       if ((size = write(fd, &bt_status_on, 1)) < 0) {
+            ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+    #ifdef WIFI_BT_STATUS_SYNC
+            bt_semaphore_release(lock_fd);
+            bt_semaphore_destroy(lock_fd);
+    #endif
+}
+#endif
+//}
+//tkun add
+#if 0
+    /* Write value to control rfkill */
+    if ((size = write(fd, &on, 1)) < 0) {
+        ALOGE("write(%s) failed: %s (%d)",rfkill_state, strerror(errno),errno);
+#ifdef WIFI_BT_STATUS_SYNC
+        bt_semaphore_release(lock_fd);
+        bt_semaphore_destroy(lock_fd);
+#endif
+        return -1;
+    }
+#endif//tkun add
+#if 0
+#ifdef BT_SOC_TYPE_ROME
+    if(on == '0'){
+        ALOGE("Stopping HCI filter as part of CTRL:OFF");
+//        stop_hci_filter();
+        property_set("wc_transport.soc_initialized", "0");
+    }
+#endif
+#ifdef WIFI_BT_STATUS_SYNC
+    /* query wifi status */
+    property_get(WIFI_PROP_NAME, wifi_status, "");
+
+    ALOGE("bt get wifi status: %s, isInit: %d\n",  wifi_status, isInit);
+
+    /* If wlan driver is not loaded, and bt is changed from off => on */
+    if (strncmp(wifi_status, "unloaded", strlen("unloaded")) == 0 || strlen(wifi_status) == 0) {
+        if (on == '1') {
+            ALOGI("%s: BT_VND_PWR_ON\n", __func__);
+            if(property_set(SERVICE_PROP_NAME, "load_wlan") < 0) {
+                ALOGE("%s Property setting failed", SERVICE_PROP_NAME);
+                close(fd);
+                bt_semaphore_release(lock_fd);
+                bt_semaphore_destroy(lock_fd);
+                return -1;
+            }
+        }
+        else if (isInit == 0 && on == '0') {
+            ALOGI("%s: BT_VND_PWR_OFF\n", __func__);
+            if(property_set(SERVICE_PROP_NAME, "unbind_hsic") < 0) {
+                ALOGE("%s Property setting failed", SERVICE_PROP_NAME);
+                close(fd);
+                bt_semaphore_release(lock_fd);
+                bt_semaphore_destroy(lock_fd);
+                return -1;
+            }
+       }
+    }
+
+    if (isInit == 0 && on == '0')
+        property_set(BT_STATUS_NAME, "false");
+    else if (on == '1')
+        property_set(BT_STATUS_NAME, "true");
+
+    bt_semaphore_release(lock_fd);
+    bt_semaphore_destroy(lock_fd);
+#endif /* WIFI_BT_STATUS_SYNC */
+
+done:
+    if (fd >= 0)
+        close(fd);
+#endif
+    return 0;
+}
+
 /*****************************************************************************
 **
 **   BLUETOOTH VENDOR INTERFACE LIBRARY FUNCTIONS
@@ -491,9 +753,30 @@ done:
 
 static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
 {
-    int i;
-
+    int i,ret;
+    int fd_state;
+	char power_set[PROPERTY_VALUE_MAX];
     ALOGI("bt-vendor : init");
+//tkun add
+////
+
+    ALOGI("bt-vendor............................... : init");
+
+	ret = property_get("bt.qcom9377.power", power_set, NULL);
+	if (ret != 0) {		
+		if (strcasecmp(power_set, "off") == 0) {
+			ALOGI("bt qcom9377 power up\n");
+			ret = bt_powerup(0);
+			property_set("bt.qcom9377.power", "on");
+		}else
+			ALOGI("bt qcom9377 already powered up\n");
+	}
+	else {
+		ALOGE("not using property\n");
+		ret = bt_powerup(0);
+	}
+
+	
 
     if (p_cb == NULL)
     {
@@ -662,7 +945,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
                         /* BT Chipset Power Control through Device Tree Node */
-                        retval = bt_powerup(nState);
+                        retval = bt_powerup_init(nState);
                     default:
                         break;
                 }
@@ -673,8 +956,19 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             {
                 // call hciattach to initalize the stack
                 if(bt_vendor_cbacks){
-                   ALOGI("Bluetooth Firmware and transport layer are initialized");
-                   bt_vendor_cbacks->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
+                   if (btSocType ==  BT_SOC_ROME) {
+                       if (is_soc_initialized()) {
+                           ALOGI("Bluetooth FW and transport layer are initialized");
+                           bt_vendor_cbacks->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
+                       } else {
+                           ALOGE("bt_vendor_cbacks is null or SoC not initialized");
+                           ALOGE("Error : hci, smd initialization Error");
+                           retval = -1;
+                       }
+                   } else {
+                       ALOGI("Bluetooth FW and transport layer are initialized");
+                       bt_vendor_cbacks->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
+                   }
                 }
                 else{
                    ALOGE("bt_vendor_cbacks is null");
@@ -690,14 +984,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     bt_vendor_cbacks->scocfg_cb(BT_VND_OP_RESULT_SUCCESS); //dummy
             }
             break;
-#ifdef BT_SOC_TYPE_ROME
-#ifdef ENABLE_ANT
-        case BT_VND_OP_ANT_USERIAL_OPEN:
-                ALOGI("bt-vendor : BT_VND_OP_ANT_USERIAL_OPEN");
-                is_ant_req = true;
-                //fall through
-#endif
-#endif
         case BT_VND_OP_USERIAL_OPEN:
             {
                 int (*fd_array)[] = (int (*)[]) param;
@@ -746,6 +1032,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                         {
                             property_get("persist.BT3_2.version", bt_version, false);
+#if 0
                             if (!is_soc_initialized()) {
                                 fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
                                 if (fd < 0) {
@@ -800,31 +1087,76 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                         ignore_boot_prop = TRUE;
                                     }
 #endif //READ_BT_ADDR_FROM_PROP
-#ifdef BT_NV_SUPPORT
                                     /* Always read BD address from NV file */
                                     if(ignore_boot_prop && !bt_vendor_nv_read(1, vnd_local_bd_addr))
                                     {
                                        /* Since the BD address is configured in boot time We should not be here */
                                        ALOGI("Failed to read BD address. Use the one from bluedroid stack/ftm");
                                     }
-#endif //BT_NV_SUPPORT
                                     if(rome_soc_init(fd,vnd_local_bd_addr)<0) {
                                         retval = -1;
                                         userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
                                     } else {
                                         ALOGV("rome_soc_init is completed");
                                         property_set("wc_transport.soc_initialized", "1");
+                                        #ifdef QCOM_BT_SIBS_ENABLE
                                         userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
                                         /*Close the UART port*/
                                         close(fd);
+                                        #endif
                                     }
                                 }
                             }
+#else
+                                fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
+                                if (fd < 0) {
+                                    ALOGE("userial_vendor_open returns err");
+                                    retval = -1;
+                                } else {
+                                    /* Clock on */
+                                    userial_clock_operation(fd, USERIAL_OP_CLK_ON);
+                                    ALOGD("userial clock on");
+                                    if(strcmp(bt_version, "true") == 0) {
+                                        property_get("ro.bluetooth.wipower", wipower_status, false);
+                                        if(strcmp(wipower_status, "true") == 0) {
+                                            check_embedded_mode(fd);
+                                        } else {
+                                            ALOGI("Wipower not enabled");
+                                        }
+                                    }
+                                  if (!is_soc_initialized()) {
+                                    ALOGV("rome_soc_init is started");
+                                    property_set("wc_transport.soc_initialized", "0");
+                                    /* Always read BD address from NV file */
+                                    if(ignore_boot_prop && !bt_vendor_nv_read(1, vnd_local_bd_addr))
+                                    {
+                                       /* Since the BD address is configured in boot time We should not be here */
+                                       ALOGI("Failed to read BD address. Use the one from bluedroid stack/ftm");
+                                    }
+                                    if(rome_soc_init(fd,vnd_local_bd_addr)<0) {
+                                        retval = -1;
+                                        userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+                                    } else {
+                                        ALOGV("rome_soc_init is completed");
+                                        property_set("wc_transport.soc_initialized", "1");
+                                        #ifdef QCOM_BT_SIBS_ENABLE
+                                        userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+                                        /*Close the UART port*/
+                                        close(fd);
+                                        #endif
+                                    }
+                                  }
+                                  else
+                                    userial_vendor_set_baud(USERIAL_BAUD_2M);
+                                }
+#endif
 
                             property_set("wc_transport.clean_up","0");
                             if (retval != -1) {
 #ifdef BT_SOC_TYPE_ROME
+                                 #ifdef QCOM_BT_SIBS_ENABLE
                                  start_hci_filter();
+                                 #endif
                                  if (is_ant_req) {
                                      ALOGV("connect to ant channel");
                                      ant_fd = fd = connect_to_local_socket("ant_sock");
@@ -833,7 +1165,9 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 #endif
                                  {
                                      ALOGV("connect to bt channel");
+                                 #ifdef QCOM_BT_SIBS_ENABLE
                                      vnd_userial.fd = fd = connect_to_local_socket("bt_sock");
+                                 #endif
                                  }
 
                                  if (fd != -1) {
@@ -846,6 +1180,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                              rome_get_addon_feature_list(fd);
                                          }
                                      }
+                                     //enable_controller_log(fd);
                                      for (idx=0; idx < CH_MAX; idx++)
                                           (*fd_array)[idx] = fd;
                                           retval = 1;
@@ -865,21 +1200,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                 }
             }
             break;
-#ifdef BT_SOC_TYPE_ROME
-#ifdef ENABLE_ANT
-        case BT_VND_OP_ANT_USERIAL_CLOSE:
-            {
-                ALOGI("bt-vendor : BT_VND_OP_ANT_USERIAL_CLOSE");
-                property_set("wc_transport.clean_up","1");
-                if (ant_fd != -1) {
-                    ALOGE("closing ant_fd");
-                    close(ant_fd);
-                    ant_fd = -1;
-                }
-            }
-            break;
-#endif
-#endif
         case BT_VND_OP_USERIAL_CLOSE:
             {
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_CLOSE btSocType: %d", btSocType);
@@ -892,6 +1212,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                      case BT_SOC_ROME:
                      case BT_SOC_AR3K:
                         property_set("wc_transport.clean_up","1");
+                        //property_set("wc_transport.soc_initialized", "0");
                         userial_vendor_close();
                         break;
                     default:
@@ -942,7 +1263,8 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             else if (wake_assert == 1)
                                 ALOGV("DEASSERT: Allowing BT-Device to Sleep");
 
-#ifdef QCOM_BT_SIBS_ENABLE
+//need fix, no lpm_set_state_cb defined yet
+#if 0
                             if(bt_vendor_cbacks){
                                 ALOGI("Invoking HCI H4 callback function");
                                bt_vendor_cbacks->lpm_set_state_cb(wake_assert);
@@ -1000,25 +1322,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 #endif
             }
             break;
-        case BT_VND_OP_GET_LINESPEED:
-            {
-                retval = -1;
-                switch(btSocType)
-                {
-                    case BT_SOC_ROME:
-                        if(!is_soc_initialized()) {
-                            ALOGE("BT_VND_OP_GET_LINESPEED: error"
-                            " - transport driver not initialized!");
-                        }else {
-                            retval = 3000000;
-                        }
-                        break;
-                    default:
-                        retval = userial_vendor_get_baud();
-                        break;
-                 }
-                break;
-            }
     }
 
     return retval;
@@ -1035,12 +1338,6 @@ static void ssr_cleanup(void) {
     }
 
     if (btSocType == BT_SOC_ROME) {
-#ifdef BT_SOC_TYPE_ROME
-#ifdef ENABLE_ANT
-        /*Close both ANT channel*/
-        op(BT_VND_OP_ANT_USERIAL_CLOSE, NULL);
-#endif
-#endif
         /*Close both ANT channel*/
         op(BT_VND_OP_USERIAL_CLOSE, NULL);
         /*CTRL OFF twice to make sure hw

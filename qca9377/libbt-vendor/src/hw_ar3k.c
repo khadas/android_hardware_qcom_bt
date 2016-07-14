@@ -46,7 +46,6 @@ extern "C" {
 #include <ctype.h>
 #include <cutils/properties.h>
 #include <stdlib.h>
-#include <string.h>
 #include <termios.h>
 
 #include "bt_hci_bdroid.h"

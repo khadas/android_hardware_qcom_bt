@@ -20,7 +20,7 @@ ifneq ($(BOARD_HAVE_BLUETOOTH_QCOM),)
 
 include $(CLEAR_VARS)
 
-BDROID_DIR:= system/bt
+BDROID_DIR:= external/bluetooth/bluedroid
 
 LOCAL_SRC_FILES := \
         src/bt_vendor_qcom.c \
@@ -29,8 +29,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_C_INCLUDES += \
         $(LOCAL_PATH)/include \
-        $(BDROID_DIR)/hci/include \
-        $(BDROID_DIR)/stack/include
+        $(BDROID_DIR)/hci/include
 
 LOCAL_SHARED_LIBRARIES := \
         libcutils \
@@ -40,7 +39,7 @@ LOCAL_MODULE := libbt-vendor
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 LOCAL_MODULE_OWNER := qcom
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
 
 include $(LOCAL_PATH)/vnd_buildcfg.mk
 

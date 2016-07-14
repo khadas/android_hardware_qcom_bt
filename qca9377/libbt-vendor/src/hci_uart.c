@@ -31,7 +31,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
-#include <string.h>
 #include "bt_vendor_qcom.h"
 #include "hci_uart.h"
 
@@ -472,10 +471,13 @@ int read_hci_event(int fd, unsigned char* buf, int size)
      * should be 0x04, so we read until we get to the 0x04. */
     while (1) {
             r = read(fd, buf, 1);
+	  ALOGI("%c: Wait for Command Compete Event from SOC",buf[0]);
             if (r <= 0)
                     return -1;
-            if (buf[0] == 0x04)
+            if (buf[0] == 0x04){
+		ALOGI("break.......");
                     break;
+		}
     }
     count++;
 
@@ -499,6 +501,7 @@ int read_hci_event(int fd, unsigned char* buf, int size)
                     return -1;
             count += r;
     }
+    ALOGI("%s: return............", __FUNCTION__);
     return count;
 }
 

@@ -18,11 +18,8 @@
 #define BT_VENDOR_QCOM_H
 
 #include "bt_vendor_lib.h"
-//#include "vnd_buildcfg.h"
-
-#define STREAM_TO_UINT16(u16, p) {u16 = ((uint16_t)(*(p)) + (((uint16_t)(*((p) + 1))) << 8)); (p) += 2;}
-#define UINT16_TO_STREAM(p, u16) {*(p)++ = (uint8_t)(u16); *(p)++ = (uint8_t)((u16) >> 8);}
-#define UINT32_TO_STREAM(p, u32) {*(p)++ = (uint8_t)(u32); *(p)++ = (uint8_t)((u32) >> 8); *(p)++ = (uint8_t)((u32) >> 16); *(p)++ = (uint8_t)((u32) >> 24);}
+#include "vnd_buildcfg.h"
+#include "utils.h"
 
 #ifndef FALSE
 #define FALSE  0
@@ -61,4 +58,3 @@ extern bt_vendor_callbacks_t *bt_vendor_cbacks;
 #define HCI_EVT_CMD_CMPL_OPCODE        3
 
 #endif /* BT_VENDOR_QCOM_H */
-
