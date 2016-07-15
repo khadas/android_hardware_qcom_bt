@@ -19,7 +19,8 @@
 
 #include "bt_vendor_lib.h"
 #include "vnd_buildcfg.h"
-#include "utils.h"
+#include "bt_types.h"
+//#include "utils.h"
 
 #ifndef FALSE
 #define FALSE  0
